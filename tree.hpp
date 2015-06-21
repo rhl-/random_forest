@@ -44,9 +44,23 @@ template< typename Label_type>
 class decision_tree {
 public:
  typedef dtree_node< Label_type> node;
- 
+
+ //Default Constructor
  decision_tree( int reserve_max_size=500){ tree_nodes.reserve( reserve_max_size); }
 
+ //Copy Constructor
+ decision_tree( decision_tree& t): tree_nodes( t.tree_nodes){}
+
+ //Move Constructor
+ decision_tree( decision_tree&& t): tree_nodes( std::move( t.tree_nodes)){}
+ 
+ //Assignment operator
+ decision_tree& operator=( const decision_tree& f) { tree_nodes = f.tree_nodes; }
+
+ //Move Assignment operator
+ decision_tree& operator=( decision_tree&& f) { tree_nodes = std::move( f.tree_nodes); }
+
+ //Access a node
  node& operator[]( std::size_t i){ return tree_nodes[ i]; }
 
 /**
