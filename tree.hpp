@@ -6,52 +6,97 @@ namespace ayasdi{
 namespace ml {
 
 //Forward declarations
+template< typename Label_type>
 class decision_tree; //necessary only for friend declaration below
+template< typename Label_type>
+class dtree_node{
+public:
+ dtree_node(){}
+ dtree_node( std::size_t split, double split_value, int left_child_index=0, int right_child_index=0):
+ split_( split), split_value_( split_value), left_child_index_( left_child_index), right_child_index_( right_child_index) {}
 
-struct dtree_node{
+ bool operator!=( const dtree_node& b) const{ return !(this->operator==( b)); }
  bool operator==( const dtree_node& b) const{ 
      if( this == &b) { return true; }
-     return (split_value == b.split_value) && (split == b.split) && 
-         (left_child_index == b.left_child_index) && (right_child_index == b.right_child_index);
+     return (split_value_ == b.split_value_) && (split_ == b.split_) && 
+         (left_child_index_ == b.left_child_index_) && (right_child_index_ == b.right_child_index_);
  }
 
- int left_child() const { return left_child_index; }
- int right_child() const { return right_child_index; }
+ bool     is_leaf() const { return (left_child_index_ == 0 && 
+                                    right_child_index_ == 0); }
+ bool is_not_leaf() const { return !is_leaf(); }
  
- std::size_t split; 
- double split_value;
+ //TODO: Figure out the correct behavior for this
+ Label_type class_label() const { return (Label_type)split_value_; }
 
- private:
- int left_child_index;
- int right_child_index;   
- friend decision_tree;
+ int  left_child_index() const { return  left_child_index_; }
+ int right_child_index() const { return right_child_index_; }
+ //TODO: Define invariants for how these values are set for leaf nodes.
+ std::size_t split_=0; 
+ double split_value_=0;
+private:
+ int left_child_index_=0;
+ int right_child_index_=0;   
+ friend decision_tree< Label_type>;
 }; //end struct dtree_node
 
+template< typename Label_type>
 class decision_tree {
- public:
- typedef dtree_node node;
+public:
+ typedef dtree_node< Label_type> node;
  
  decision_tree( int reserve_max_size=500){ tree_nodes.reserve( reserve_max_size); }
 
  node& operator[]( std::size_t i){ return tree_nodes[ i]; }
 
+/**
+ * Inserts left child
+ */
  node& insert_left_child(node& parent){
-     parent.left_child_index = tree_nodes.size();
+     parent.left_child_index_ = tree_nodes.size();
      return insert();
  }
- 
+
+ /**
+ * Inserts right child
+ */
  node& insert_right_child(node& parent){
-     parent.right_child_index = tree_nodes.size();
+     parent.right_child_index_ = tree_nodes.size();
      return insert();
  }
- 
+
+/** 
+ * inserts the left and right node into the tree
+ */
  std::tuple<node&,node&>
  insert_children( node& parent){
      auto& left_child = insert_left_child( parent);
      auto& right_child = insert_right_child( parent);		
      return std::forward_as_tuple(left_child, right_child);
  }
- 
+
+ /**
+ * Input: a datapoint which provides a double operator[]()
+ * This function walks the decision tree and returns the 
+ * class_label() supported by this tree. 
+ */
+ template< typename Datapoint>
+ Label_type vote( Datapoint& p){
+    node& current_node = root();
+    while( current_node.is_not_leaf()){
+        if( p[ current_node.split_] < current_node.split_value_){
+            current_node = tree_nodes[ current_node.left_child_index()];
+        }else{ 
+            current_node = tree_nodes[ current_node.right_child_index()];
+        }
+    }
+    return current_node.class_label();
+ }
+
+ /**
+ * Returns the root of the tree.
+ * In debug mode checks that the tree is nonempty first.
+ */
  node& root() { 
      #ifdef NDEBUG
      if( tree_nodes.empty()){ std::cerr << "Bug in use of decision_tree." << std::endl; }
@@ -59,11 +104,18 @@ class decision_tree {
      return tree_nodes[ 0]; 
  }
  
+ /**
+ * inserts the root node into the tree if empty.
+ * otherwise equivalent to a call to root()
+ */
  node& insert_root(){
      if( tree_nodes.size() > 0){ return root(); }
      return insert();
  }
- 
+
+ /**
+ * Reserve space for the tree.
+ */
  void reserve( int size){ tree_nodes.reserve( size); }
  
 private:
