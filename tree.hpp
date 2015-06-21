@@ -9,8 +9,6 @@ namespace ml {
 class decision_tree; //necessary only for friend declaration below
 
 struct dtree_node{
- std::size_t split;
- double split_value;
  bool operator==( const dtree_node& b) const{ 
      if( this == &b) { return true; }
      return (split_value == b.split_value) && (split == b.split) && 
@@ -19,6 +17,9 @@ struct dtree_node{
 
  int left_child() const { return left_child_index; }
  int right_child() const { return right_child_index; }
+ 
+ std::size_t split; 
+ double split_value;
 
  private:
  int left_child_index;
@@ -48,7 +49,7 @@ class decision_tree {
  insert_children( node& parent){
      auto& left_child = insert_left_child( parent);
      auto& right_child = insert_right_child( parent);		
-     return std::forward_as_tuple(left_child,right_child);
+     return std::forward_as_tuple(left_child, right_child);
  }
  
  node& root() { 
