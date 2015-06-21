@@ -21,36 +21,37 @@ private:
  typedef decision_tree< Label_type> tree;
  typedef boost::counting_iterator<std::size_t> counting_iterator;
 
-template< typename Row_index_iterator>
-bool is_pure_column( Row_index_iterator begin, Row_index_iterator end, Output& output){
-    auto r = output[ *begin];
-    for( ++begin; begin != end; ++begin){
-        if( r != output[ *begin]){
-            return false;
-        }
-    }
-    return true;
-}
-
-//Set data of leaf node to be a leaf node.
-//TODO: This needs to be carefully handled.
-void generate_leaf_node( typename tree::node& n, Label_type label){ n.split_value_ = label; }
-
-//Set data of node to be an internal decision node of tree
-void set_split( typename tree::node& n, std::size_t& column_index, double& split_threshold_value){
-    n.split_ = column_index;
-    n.split_value_ = split_threshold_value;
-}
-
-template< typename Row_index_iterator>
-Label_type get_majority_vote( Row_index_iterator begin, Row_index_iterator end, Output& output){
-    typedef std::unordered_map< Label_type, std::size_t> Map;
-    Map votes;
-    for( ; begin != end; ++begin){ votes[ *begin]++; }
-    typedef typename Map::value_type pair;
-    auto& max_elt= std::max( votes.begin(), votes.end(), [&](pair& a, pair& b){ return a.second < b.second; });
-    return max_elt.first;
-}
+ template< typename Row_index_iterator>
+ bool is_pure_column( Row_index_iterator begin, Row_index_iterator end, Output& output){
+     auto r = output[ *begin];
+     for( ++begin; begin != end; ++begin){
+         if( r != output[ *begin]){
+             return false;
+         }
+     }
+     return true;
+ }
+ 
+ //Set data of leaf node to be a leaf node.
+ //TODO: This needs to be carefully handled.
+ void generate_leaf_node( typename tree::node& n, Label_type label){ n.split_value_ = label; }
+ 
+ //Set data of node to be an internal decision node of tree
+ void set_split( typename tree::node& n, std::size_t& column_index, double& split_threshold_value){
+     n.split_ = column_index;
+     n.split_value_ = split_threshold_value;
+ }
+ 
+ template< typename Row_index_iterator>
+ Label_type get_majority_vote( Row_index_iterator begin, Row_index_iterator end, Output& output){
+     typedef std::unordered_map< Label_type, std::size_t> Map;
+     Map votes;
+     for( ; begin != end; ++begin){ votes[ *begin]++; }
+     typedef typename Map::value_type pair;
+     auto& max_elt= std::max( votes.begin(), votes.end(), 
+                              [&](pair& a, pair& b){ return a.second < b.second; });
+     return max_elt.first;
+ }
 public:
  template< typename Row_index_iterator>
  void build_random_tree( Row_index_iterator begin, Row_index_iterator end, 
