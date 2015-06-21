@@ -49,9 +49,27 @@ private:
      for( ; begin != end; ++begin){ votes[ *begin]++; }
      typedef typename Map::value_type pair;
      auto& max_elt= std::max( votes.begin(), votes.end(), 
-                              [&](pair& a, pair& b){ return a.second < b.second; });
+                              [&](const pair& a, const pair& b){ return a.second < b.second; });
      return max_elt.first;
  }
+
+ template< typename Column_iterator, typename Row_index_iterator, typename Output_column_iterator>
+ std::pair< std::size_t, double>
+ find_best_column_split( Column_iterator col_begin, Column_iterator col_end,
+                          //Observation: we may sort the row iterators safely
+                          Row_index_iterator row_idx_begin, Row_index_iterator row_idx_end,
+                          Output_column_iterator begin, Output_column_iterator end){
+    //We just sort the row indices into order
+    //We can GPU accelerate this for fun with thrust::sort()
+    //Also we can try tbb::sort()
+    std::sort( row_idx_begin, row_idx_end, 
+                 [&](const std::size_t& a, const std::size_t& b){ return *(col_begin+a) < *(col_begin+b);});
+    for( auto skip_index = ++row_idx_begin; skip_index != row_idx_end;  ++skip_index){
+        //TODO: Compute Entropy
+    }
+    return std::make_pair( 0, 0.0);
+ }
+
 public:
  template< typename Row_index_iterator>
  void build_random_tree( Row_index_iterator begin, Row_index_iterator end, 
@@ -87,7 +105,6 @@ public:
     std::tuple< Vector, Vector> row_indices_for_split;
     //Find the best split within each column, find minimal overall split.
     for(auto& column: columns){
-        //TODO: Implement this
         std::pair< std::size_t, double> 
         split_and_entropy = find_best_column_split( dataset.begin( column), dataset.end( column), 
                                                     begin, end, //Obs: We may sort this all we like.
@@ -128,8 +145,8 @@ public:
         auto& current_tree = insert();
         current_tree.reserve( dataset.m());
         auto& root = current_tree.insert_root();
-        build_random_tree( counting_iterator( 0), counting_iterator( dataset.m()), 
-                           dataset, output, current_tree, root); 
+        std::vector< std::size_t> row_indices( counting_iterator( 0),  counting_iterator( dataset.m()));
+        build_random_tree( row_indices.begin(), row_indices.end(), dataset, output, current_tree, root); 
     }
  }
 
@@ -139,7 +156,7 @@ public:
      Map votes;
      for( auto & tree: trees){ votes[ tree.vote( p)]++; }
      typedef typename Map::value_type pair;
-     std::max( votes.begin(), votes.end(), [&](pair& a, pair& b){ return a.second < b.second; });
+     std::max( votes.begin(), votes.end(), [&](const pair& a, const pair& b){ return a.second < b.second; });
  }
  
 private:
