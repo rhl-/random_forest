@@ -17,7 +17,7 @@ TEST_CASE("Tree Tests", "[decision_tree]"){
   auto children = t.insert_children( g);
   auto& left_child = std::get<0>( children);
   auto& right_child = std::get<1>( children);
-  t[  g.left_child()] == left_child;
-  t[ g.right_child()] == right_child;
+  REQUIRE( t[  g.left_child()] == left_child);
+  REQUIRE( t[ g.right_child()] == right_child);
  }
 }

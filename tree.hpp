@@ -31,7 +31,9 @@ class decision_tree {
  typedef dtree_node node;
  
  decision_tree( int reserve_max_size=500) { tree_nodes.reserve( reserve_max_size); }
- 
+
+ node& operator[]( std::size_t i){ return tree_nodes[ i]; }
+
  node& insert_left_child(node& parent){
      parent.left_child_index = tree_nodes.size();
      return insert();
