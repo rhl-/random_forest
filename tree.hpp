@@ -31,6 +31,7 @@ public:
 
  int  left_child_index() const { return  left_child_index_; }
  int right_child_index() const { return right_child_index_; }
+
  //TODO: Define invariants for how these values are set for leaf nodes.
  std::size_t split_=0; 
  double split_value_=0;

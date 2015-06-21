@@ -64,9 +64,10 @@ namespace ayasdi{
  * If at least out_end - out_begin elements were written, the return value
  * is out_end.
  */
-template <typename InputIterator, typename RandomAccessIterator>
+template <typename InputIterator, typename RandomAccessIterator, typename RandomGenerator>
 RandomAccessIterator random_sample(InputIterator in_begin, InputIterator in_end,
-                            RandomAccessIterator out_begin, RandomAccessIterator out_end){
+                                   RandomAccessIterator out_begin, RandomAccessIterator out_end, 
+                                   RandomGenerator rng){
   /* Try reading in out_end - out_begin elements, aborting early if they can't
    * be read.
    */
@@ -120,5 +121,3 @@ RandomAccessIterator random_sample(InputIterator in_begin, InputIterator in_end,
   return random_sample(in_begin, in_end, out_begin, out_end, std::rand);
 }
 } //namespace ayasdi
-
-#endif
