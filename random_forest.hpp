@@ -6,10 +6,8 @@
 
 //STL
 #include <unordered_map>
-#include <cmath>
-
-//Boost
-#include <boost/iterator/counting_iterator.hpp>
+#include <cmath> //log
+#include <numeric> //iota
 
 #define MAX_TREE_HEIGHT 30
 
@@ -22,7 +20,6 @@ public:
  typedef typename Output::value_type Label_type;
 private:
  typedef decision_tree< Label_type> tree;
- typedef boost::counting_iterator<std::size_t> counting_iterator;
 
  template< typename Row_index_iterator>
  bool is_pure_column( Row_index_iterator begin, Row_index_iterator end, Output& output){
@@ -86,16 +83,15 @@ private:
     //We just sort the row indices into order
     //We can GPU accelerate this for fun with thrust::sort()
     //Also we can try tbb::sort()
-    std::sort( row_idx_begin, row_idx_end, 
-                 [&](const std::size_t& a, const std::size_t& b)->bool{ return *(col_begin+a) < *(col_begin+b);} );
+    auto cmp = [&](const std::size_t& a, const std::size_t& b)->bool{ return (*(col_begin+a) < *(col_begin+b));};
+    std::sort( row_idx_begin, row_idx_end, cmp);
     Map lower_counts, upper_counts;
-    for( ; row_idx_begin != row_idx_end; ++row_idx_begin) { upper_counts[ *row_idx_begin]++; }
+    for( auto i = row_idx_begin; i != row_idx_end; ++i) { upper_counts[ *i]++; }
    
     std::size_t number_of_rows=std::distance(row_idx_begin,row_idx_end);
-    std::pair< std::size_t, double> best_split(-1, std::numeric_limits< double>::infinity());
+    std::pair< std::size_t, double> best_split(0, std::numeric_limits< double>::infinity());
     //By assumption at this point number_of_rows > 1
     best_split.second = balanced_entropy( lower_counts, upper_counts, 1, number_of_rows-1, number_of_rows);
-
     std::size_t category_width=0;
     for( auto split_index = row_idx_begin+1; split_index != row_idx_end;  ++split_index){
         //TODO: Compute split optimization function Entropy, Gini, etc.
@@ -111,7 +107,7 @@ private:
         auto upper_index = number_of_rows-lower_index;
         auto current_entropy = balanced_entropy( lower_counts, upper_counts, lower_index, upper_index, number_of_rows);
         if( current_entropy < best_split.second){     
-           best_split.first  = *split_index;
+           best_split.first  = std::distance( row_idx_begin, split_index);
            best_split.second = current_entropy;
            if( current_entropy == 0.0 ){ return best_split; }
         }
@@ -127,15 +123,15 @@ public:
  }
 
  template< typename Row_index_iterator>
- void build_random_tree( Row_index_iterator begin, Row_index_iterator end, 
+ void build_random_tree( Row_index_iterator row_begin, Row_index_iterator row_end, 
                          Dataset& dataset, Output& output, tree& t, typename tree::node& n, 
                         std::size_t height=0){
     typedef std::vector< std::size_t> Vector;
     
     //Not possible to split, decision is already made.
     //Create a leaf node with this decision
-    if( is_pure_column( begin, end, output)){
-        Label_type& class_label = output[ *begin];
+    if( is_pure_column( row_begin, row_end, output)){
+        Label_type& class_label = output[ *row_begin];
         generate_leaf_node(n, class_label);
         return;
     }
@@ -143,17 +139,23 @@ public:
     //TODO: Check if assuming log( number of data elements) is appropriate
     //Data is too small to waste time splitting. We punt.
     //Create a leaf node and give it a majority decision
-    if( height > max_tree_height() || std::distance(begin, end) < std::log( dataset.m())){
-        auto class_label = get_majority_vote( begin, end, output);
+    if( height > max_tree_height() || std::distance(row_begin, row_end) < std::log( dataset.m())){
+        auto class_label = get_majority_vote( row_begin, row_end, output);
         generate_leaf_node(n, class_label);
         return;
     }
 
-    Vector columns( column_subset_size_);
-    //randomly pick a subset of size column_subset_size
-    //This is inefficient since we have R.A. to [0,n]
-    random_sample( counting_iterator( 0), counting_iterator( dataset.n()), 
-                   columns.begin(), columns.end());
+    //Choose a random subset of subset_size columns
+    int subset_size = column_subset_size_*dataset.n();
+    //create a vector of length n
+    Vector columns( dataset.n(), 0);
+    //fill with numbers [0,n)
+    std::iota(columns.begin(), columns.end(), 0);
+    //random permutation
+    std::random_shuffle(columns.begin(), columns.end());
+    //hang on to only the first subset_size of them.
+    columns.erase( columns.begin()+subset_size, columns.end());
+
     //Output Variables
     double best_entropy=std::numeric_limits< double>::infinity();
     std::size_t column_index_for_split=std::numeric_limits< std::size_t>::infinity();
@@ -163,7 +165,7 @@ public:
     for(auto& column: columns){
         std::pair< std::size_t, double> 
         split_and_entropy = find_best_column_split( dataset.begin( column), dataset.end( column), 
-                                                    begin, end, //Obs: We may sort this all we like.
+                                                    row_begin, row_end, //Obs: We may sort this all we like.
                                                     output.begin(), output.end());
         if( split_and_entropy.second < best_entropy){
             //Record the entropy so far and which column we are in
@@ -174,13 +176,13 @@ public:
             std::size_t split_index = split_and_entropy.first;
 
             //Get the entry containing the split_threshold_value
-            split_threshold_value = *(dataset.begin( column)+*(begin+split_index));
+            split_threshold_value = *(dataset.begin( column)+*(row_begin+split_index));
 
             //Since we resort at every step we make physical copies of the row indices
             //If the column was gaurunteed sorted then we could skip this!
             //This seems like it should save a lot of memory..!
-            row_indices_for_split = std::move( std::make_tuple( Vector( begin, begin+split_index),
-                                                                Vector( begin+split_index, end)));
+            row_indices_for_split = std::move( std::make_tuple( Vector( row_begin, row_begin+split_index),
+                                                                Vector( row_begin+split_index, row_end)));
         }
     }
     //Build the split into the tree
@@ -191,8 +193,12 @@ public:
     auto& left_indices = std::get< 0>(row_indices_for_split);
     auto& right_indices = std::get< 1>(row_indices_for_split);
     ++height; //make sure to increment height!
-    build_random_tree( left_indices.begin(), left_indices.end(), dataset, output, t, std::get<0>(kids), height);
-    build_random_tree( right_indices.begin(), right_indices.end(), dataset, output, t, std::get<1>(kids),height);
+    if(left_indices.size()) {
+        build_random_tree(left_indices.begin(), left_indices.end(), dataset, output, t, std::get<0>(kids), height);
+    }
+    if( right_indices.size()) {
+        build_random_tree(right_indices.begin(), right_indices.end(), dataset, output, t, std::get<1>(kids), height);
+    }
  }
 
  template< typename Column_major_dataset>
@@ -202,7 +208,8 @@ public:
         auto& current_tree = insert();
         //current_tree.reserve( dataset.m());
         auto& root = current_tree.insert_root();
-        std::vector< std::size_t> row_indices( counting_iterator( 0),  counting_iterator( dataset.m()));
+        std::vector< std::size_t> row_indices( dataset.m(), 0);
+        std::iota( row_indices.begin(), row_indices.end(), 0);
         build_random_tree( row_indices.begin(), row_indices.end(), dataset, output, current_tree, root); 
     }
  }
@@ -222,9 +229,9 @@ private:
     return trees.back();
  }
  std::vector< tree> trees;
- std::size_t number_of_trees_;
- std::size_t column_subset_size_;
- std::size_t max_tree_height_;
+ std::size_t number_of_trees_=500;
+ double column_subset_size_=.30;
+ std::size_t max_tree_height_=MAX_TREE_HEIGHT;
 }; //end class random_forest
 
 } //end namespace ml
