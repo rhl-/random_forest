@@ -1,4 +1,4 @@
-#include "random_forest.hpp"
+#include <ayasdi/random_forest.hpp>
 #include <ayasdi/math.hpp>
 
 namespace math = ayasdi::math;

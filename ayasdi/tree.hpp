@@ -9,6 +9,7 @@ namespace ml {
 //Forward declarations
 template< typename Label_type>
 class decision_tree; //necessary only for friend declaration below
+
 template< typename Label_type>
 class dtree_node{
 public:

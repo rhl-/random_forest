@@ -1,8 +1,9 @@
 #include "catch.hpp"
 
 #include <iostream>
-#include <tree.hpp>
-#include <random_forest.hpp>
+//Ayasdi
+#include <ayasdi/decision_tree.hpp>
+#include <ayasdi/random_forest.hpp>
 
 namespace ml = ayasdi::ml;
 

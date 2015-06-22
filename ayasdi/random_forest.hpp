@@ -211,7 +211,7 @@ public:
         std::vector< std::size_t> row_indices( dataset.m(), 0);
         std::iota( row_indices.begin(), row_indices.end(), 0);
         std::random_shuffle( row_indices.begin(), row_indices.end());
-        row_indices.erase( row_indices.begin()+row_subset_size*row_indices.size(), row_indices.end());
+        row_indices.erase( row_indices.begin()+row_subset_size_*row_indices.size(), row_indices.end());
         build_random_tree( row_indices.begin(), row_indices.end(), dataset, output, current_tree, root); 
     }
  }
