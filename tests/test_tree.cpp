@@ -1,9 +1,8 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
 
 #include <iostream>
-#include "tree.hpp"
-#include "random_forest.hpp"
+#include <tree.hpp>
+#include <random_forest.hpp>
 
 namespace ml = ayasdi::ml;
 
