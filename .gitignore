@@ -2,5 +2,9 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 cmake_install.cmake
-tree_test
+rf_test
+rf
+test
 tags
+*.a
+.idea
