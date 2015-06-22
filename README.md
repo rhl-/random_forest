@@ -1,5 +1,4 @@
-# random_forest
-Random Forest
+# Efficient and bug-free Random Forest implementation
 
 ## Building
 ```
