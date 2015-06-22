@@ -51,9 +51,9 @@ private:
      Map votes;
      for( ; begin != end; ++begin){ votes[ *begin]++; }
      typedef typename Map::value_type pair;
-     auto& max_elt= std::max( votes.begin(), votes.end(), 
-                              [&](const pair& a, const pair& b){ return a.second < b.second; });
-     return max_elt.first;
+     auto max_elt= std::max_element( votes.begin(), votes.end(), 
+                              [](const pair& a, const pair& b)->bool{ return (a.second < b.second); } );
+     return max_elt->first;
  }
 
  template< typename Counts>
@@ -87,7 +87,7 @@ private:
     //We can GPU accelerate this for fun with thrust::sort()
     //Also we can try tbb::sort()
     std::sort( row_idx_begin, row_idx_end, 
-                 [&](const std::size_t& a, const std::size_t& b){ return *(col_begin+a) < *(col_begin+b);});
+                 [&](const std::size_t& a, const std::size_t& b)->bool{ return *(col_begin+a) < *(col_begin+b);} );
     Map lower_counts, upper_counts;
     for( ; row_idx_begin != row_idx_end; ++row_idx_begin) { upper_counts[ *row_idx_begin]++; }
    
@@ -103,7 +103,7 @@ private:
         lower_counts[class_label]++;
         upper_counts[class_label]--;
         //This logic handles repeated values in the input column
-        if( col_begin+split_index == col_begin+(split_index-1)){ 
+        if( col_begin+*split_index == col_begin+*(split_index-1)){ 
             category_width++;
             continue; 
         }else{ category_width = 0; } 
@@ -135,7 +135,7 @@ public:
     //Not possible to split, decision is already made.
     //Create a leaf node with this decision
     if( is_pure_column( begin, end, output)){
-        Label_type class_label = output[ *begin];
+        Label_type& class_label = output[ *begin];
         generate_leaf_node(n, class_label);
         return;
     }
@@ -144,7 +144,7 @@ public:
     //Data is too small to waste time splitting. We punt.
     //Create a leaf node and give it a majority decision
     if( height > max_tree_height() || std::distance(begin, end) < std::log( dataset.m())){
-        auto& class_label = get_majority_vote( begin, end, output);
+        auto class_label = get_majority_vote( begin, end, output);
         generate_leaf_node(n, class_label);
         return;
     }
@@ -174,7 +174,7 @@ public:
             std::size_t split_index = split_and_entropy.first;
 
             //Get the entry containing the split_threshold_value
-            split_threshold_value = dataset.begin( column)+*(begin+split_index);
+            split_threshold_value = *(dataset.begin( column)+*(begin+split_index));
 
             //Since we resort at every step we make physical copies of the row indices
             //If the column was gaurunteed sorted then we could skip this!
@@ -186,7 +186,7 @@ public:
     //Build the split into the tree
     set_split( n, column_index_for_split, split_threshold_value);
     //add children nodes into Decision Tree
-    auto& kids = t.insert_children( n);
+    auto kids = t.insert_children( n);
     //Recursively call.
     auto& left_indices = std::get< 0>(row_indices_for_split);
     auto& right_indices = std::get< 1>(row_indices_for_split);
@@ -213,7 +213,7 @@ public:
      Map votes;
      for( auto & tree: trees){ votes[ tree.vote( p)]++; }
      typedef typename Map::value_type pair;
-     std::max( votes.begin(), votes.end(), [&](const pair& a, const pair& b){ return a.second < b.second; });
+     std::max_element( votes.begin(), votes.end(), [](const pair& a, const pair& b)->bool { return a.second < b.second; } );
  }
  
 private:

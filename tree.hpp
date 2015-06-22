@@ -1,6 +1,7 @@
 #pragma once
 #include <tuple>
 #include <vector>
+#include <iostream>
 
 namespace ayasdi{
 namespace ml {
@@ -12,14 +13,37 @@ template< typename Label_type>
 class dtree_node{
 public:
  dtree_node(){}
+ dtree_node( const dtree_node& f): split_( f.split_), split_value_( f.split_value_), 
+                                   left_child_index_( f.left_child_index_), right_child_index_( f.right_child_index_) {}
+ dtree_node( dtree_node&& f): split_( std::move( f.split_)), 
+                              split_value_( std::move( f.split_value_)), 
+                              left_child_index_( std::move( f.left_child_index_)), 
+                              right_child_index_( std::move(f.right_child_index_)) {}
+ 
  dtree_node( std::size_t split, double split_value, int left_child_index=0, int right_child_index=0):
  split_( split), split_value_( split_value), left_child_index_( left_child_index), right_child_index_( right_child_index) {}
-
+ 
  bool operator!=( const dtree_node& b) const{ return !(this->operator==( b)); }
  bool operator==( const dtree_node& b) const{ 
      if( this == &b) { return true; }
      return (split_value_ == b.split_value_) && (split_ == b.split_) && 
          (left_child_index_ == b.left_child_index_) && (right_child_index_ == b.right_child_index_);
+ }
+ 
+ dtree_node& operator=( const dtree_node& f){
+    split_             =  f.split_;
+    split_value_       = f.split_value_; 
+    left_child_index_  =  f.left_child_index_; 
+    right_child_index_ = f.right_child_index_;
+    return *this;
+ }
+
+ dtree_node& operator=( dtree_node&& f){
+    split_ = std::move( f.split_);
+    split_value_ = std::move( f.split_value_); 
+    left_child_index_ =  std::move( f.left_child_index_); 
+    right_child_index_ = std::move(f.right_child_index_);
+    return *this;
  }
 
  bool     is_leaf() const { return (left_child_index_ == 0 && 
@@ -47,10 +71,11 @@ public:
  typedef dtree_node< Label_type> node;
 
  //Default Constructor
- decision_tree( int reserve_max_size=500){ tree_nodes.reserve( reserve_max_size); }
+ decision_tree(){ tree_nodes.reserve( 500);}
+ decision_tree( int reserve_max_size){ tree_nodes.reserve( reserve_max_size); }
 
  //Copy Constructor
- decision_tree( decision_tree& t): tree_nodes( t.tree_nodes){}
+ decision_tree( const decision_tree& t): tree_nodes( t.tree_nodes){}
 
  //Move Constructor
  decision_tree( decision_tree&& t): tree_nodes( std::move( t.tree_nodes)){}
