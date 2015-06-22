@@ -26,5 +26,7 @@ int main(int argc, char ** argv){
     Matrix_facade X( A.m(), A.n()-1, A.data());
     Output_vector y( A.m(), &*A.begin( A.n()-1));
     rf.train( A, y);
+    auto label = rf.classify( y);
+    std::cout << "label: " << label << std::endl;
     return 0;
 }

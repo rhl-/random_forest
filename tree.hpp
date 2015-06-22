@@ -121,8 +121,8 @@ public:
  * class_label() supported by this tree. 
  */
  template< typename Datapoint>
- Label_type vote( Datapoint& p){
-    node& current_node = root();
+ Label_type vote( Datapoint& p) const{
+    node current_node = root();
     while( current_node.is_not_leaf()){
         if( p[ current_node.split_] < current_node.split_value_){
             current_node = tree_nodes[ current_node.left_child_index()];
@@ -143,6 +143,15 @@ public:
      #endif
      return tree_nodes[ 0]; 
  }
+
+ const node& root() const { 
+     #ifdef NDEBUG
+     if( tree_nodes.empty()){ std::cerr << "Bug in use of decision_tree." << std::endl; }
+     #endif
+     return tree_nodes[ 0]; 
+ }
+ 
+
  
  /**
  * inserts the root node into the tree if empty.

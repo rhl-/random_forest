@@ -206,21 +206,25 @@ public:
     trees.reserve( number_of_trees_);
     for( int i = 0; i < number_of_trees_; ++i){
         auto& current_tree = insert();
-        //current_tree.reserve( dataset.m());
+        current_tree.reserve( dataset.n());
         auto& root = current_tree.insert_root();
         std::vector< std::size_t> row_indices( dataset.m(), 0);
         std::iota( row_indices.begin(), row_indices.end(), 0);
+        std::random_shuffle( row_indices.begin(), row_indices.end());
+        row_indices.erase( row_indices.begin()+row_subset_size*row_indices.size(), row_indices.end());
         build_random_tree( row_indices.begin(), row_indices.end(), dataset, output, current_tree, root); 
     }
  }
 
  template< typename Datapoint>
  Label_type classify( Datapoint& p) const{
-     typedef std::unordered_map< Label_type, std::size_t> Map; 
-     Map votes;
-     for( auto & tree: trees){ votes[ tree.vote( p)]++; }
-     typedef typename Map::value_type pair;
-     std::max_element( votes.begin(), votes.end(), [](const pair& a, const pair& b)->bool { return a.second < b.second; } );
+    typedef std::unordered_map< Label_type, std::size_t> Map; 
+    Map votes;
+    for( auto & tree: trees){ votes[ tree.vote( p)]++; }
+    typedef typename Map::value_type pair;
+    auto max_elt= 
+    std::max_element( votes.begin(), votes.end(), [](const pair& a, const pair& b)->bool { return a.second < b.second; } );
+    return max_elt->first;
  }
  
 private:
@@ -231,6 +235,7 @@ private:
  std::vector< tree> trees;
  std::size_t number_of_trees_=500;
  double column_subset_size_=.30;
+ double row_subset_size_=.67;
  std::size_t max_tree_height_=MAX_TREE_HEIGHT;
 }; //end class random_forest
 
