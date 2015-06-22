@@ -2,8 +2,8 @@
 project(rf CXX)
 ## The minimum version required (wasn't tested with on older version)
 cmake_minimum_required(VERSION 2.8)
-include_directories($ENV{HOME}/code/tdaxx/dep/math/include
-                    $ENV{HOME}/code/tdaxx/dep/math/lapack/include)
+include_directories($ENV{HOME}/Dev/ayasdi/math/include)
+include_directories($ENV{HOME}/Dev/ayasdi/math/lapack/include)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 add_definitions(-std=c++11)
 add_executable(tree_test test_tree.cpp)
