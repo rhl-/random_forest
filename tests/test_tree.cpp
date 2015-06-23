@@ -27,8 +27,8 @@ TEST_CASE("Tree Tests", "[decision_tree]"){
 }
 
 TEST_CASE("Node Tests"){
+    tree_node n;
     SECTION("Constructors"){
-     tree_node n;
      SECTION("Default Constructor"){
         REQUIRE( n.split_ == 0);
         REQUIRE( n.split_value_ ==0);
@@ -65,5 +65,4 @@ TEST_CASE("Node Tests"){
     }
   
   }
- }
 }
