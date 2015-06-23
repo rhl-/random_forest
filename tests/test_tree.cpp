@@ -1,4 +1,5 @@
 #include "catch.hpp"
+#define NDEBUG
 
 #include <iostream>
 //Ayasdi
@@ -12,30 +13,57 @@ typedef tree::node tree_node;
 
 TEST_CASE("Tree Tests", "[decision_tree]"){
  ml::decision_tree< double> t;
+ auto r = t.insert_root();
  auto tree_root = t.root();
  SECTION("Tree tests"){
      SECTION("Insert Root Node"){
-      auto r = t.insert_root();
-      REQUIRE(tree_root == r);
+         REQUIRE(tree_root == r);
+         REQUIRE(t.size() == 1);
      }
-      auto children = t.insert_children( tree_root);
-      auto& left_child = std::get<0>( children);
-      auto& right_child = std::get<1>( children);
+     auto children = t.insert_children( tree_root);
+     auto& left_child = std::get<0>( children);
+     auto& right_child = std::get<1>( children);
      SECTION("Insert Children"){
-      REQUIRE( t[  tree_root.left_child_index()] == left_child);
-      REQUIRE( t[ tree_root.right_child_index()] == right_child);
+         REQUIRE( t[  tree_root.left_child_index()] == left_child);
+         REQUIRE( t[ tree_root.right_child_index()] == right_child);
      }
      SECTION("Insert Children to the Existing Node"){
-      auto children_again = t.insert_children( tree_root);
-      REQUIRE( &(t[  tree_root.left_child_index()]) == &left_child);
-      REQUIRE( &(t[ tree_root.right_child_index()]) == &right_child);
+         auto children_again = t.insert_children( tree_root);
+         REQUIRE( &(t[  tree_root.left_child_index()]) == &left_child);
+         REQUIRE( &(t[ tree_root.right_child_index()]) == &right_child);
      }
      SECTION("Insert Grand Children To The Left Child"){
-      auto grand_children = t.insert_children( left_child);
-      auto& grand_left_child  = std::get<0>( grand_children);
-      auto& grand_right_child = std::get<1>( grand_children);
-      REQUIRE(t[ t[ tree_root.left_child_index()].left_child_index()] == grand_left_child);
-      REQUIRE(t[ t[ tree_root.left_child_index()].right_child_index()] == grand_right_child);
+         auto grand_children = t.insert_children( left_child);
+         auto& grand_left_child  = std::get<0>( grand_children);
+         auto& grand_right_child = std::get<1>( grand_children);
+         REQUIRE(t[ t[ tree_root.left_child_index()].left_child_index()] == grand_left_child);
+         REQUIRE(t[ t[ tree_root.left_child_index()].right_child_index()] == grand_right_child);
+         SECTION("Constructors And Operators"){
+             SECTION("Copy Constructor"){
+                 ml::decision_tree< double> nt (t);
+                 REQUIRE( nt.size() == t.size());
+                 for( auto i=0; i< nt.size(); i++)
+                 {
+                     REQUIRE( nt[i] == t[i] );
+                 }
+                 SECTION("Equality operator") {
+                     REQUIRE( nt == t );
+                 }
+                 SECTION("Move Constructor"){
+                     ml::decision_tree<double> c( std::move( t));
+                     REQUIRE( c == nt);
+                     REQUIRE( t.size() == 0);
+                 }
+                 SECTION("Inequality Operator"){
+                     ml::decision_tree<double> c;
+                     REQUIRE( c != nt);
+                 }
+                 SECTION( "Assignment Operator"){
+                     ml::decision_tree<double> c = t;
+                     REQUIRE( c == t);
+                 }
+             }
+         }
      }
  }
 }
@@ -73,7 +101,7 @@ TEST_CASE("Node Tests"){
     }
     SECTION("Inequality Operator"){
         tree_node c;
-        REQUIRE( c != n);
+        REQUIRE_FALSE( c != n);
     }
     SECTION( "Assignment Operator"){
     }

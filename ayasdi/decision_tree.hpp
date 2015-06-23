@@ -90,6 +90,15 @@ public:
  //Access a node
  node& operator[]( std::size_t i){ return tree_nodes[ i]; }
 
+ //Size of the tree
+ std::size_t size() { return tree_nodes.size(); }
+
+ //Equality operator
+ bool operator==( const decision_tree& f) const { return f.tree_nodes == tree_nodes; }
+
+ //Inequality operator
+ bool operator!=( const decision_tree& f) const { return !(f == *this); }
+
 /**
  * Inserts left child
  */
@@ -157,8 +166,6 @@ public:
      #endif
      return tree_nodes[ 0]; 
  }
- 
-
  
  /**
  * inserts the root node into the tree if empty.
