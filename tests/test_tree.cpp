@@ -7,6 +7,9 @@
 
 namespace ml = ayasdi::ml;
 
+typedef ml::decision_tree< double> tree; 
+typedef tree::node tree_node;
+
 TEST_CASE("Tree Tests", "[decision_tree]"){
  ml::decision_tree< double> t;
  auto tree_root = t.root();
@@ -24,8 +27,8 @@ TEST_CASE("Tree Tests", "[decision_tree]"){
      }
      SECTION("Insert Children to the Existing Node"){
       auto children_again = t.insert_children( tree_root);
-      REQUIRE( &t[  tree_root.left_child_index()] == &left_child);
-      REQUIRE( &t[ tree_root.right_child_index()] == &right_child);
+      REQUIRE( &(t[  tree_root.left_child_index()]) == &left_child);
+      REQUIRE( &(t[ tree_root.right_child_index()]) == &right_child);
      }
      SECTION("Insert Grand Children To The Left Child"){
       auto grand_children = t.insert_children( left_child);
@@ -35,4 +38,45 @@ TEST_CASE("Tree Tests", "[decision_tree]"){
       REQUIRE(t[ t[ tree_root.left_child_index()].right_child_index()] == grand_right_child);
      }
  }
+}
+
+TEST_CASE("Node Tests"){
+    tree_node n;
+    SECTION("Constructors"){
+     SECTION("Default Constructor"){
+        REQUIRE( n.split_ == 0);
+        REQUIRE( n.split_value_ ==0);
+        CHECK( n.is_leaf());
+        CHECK_FALSE( n.is_not_leaf());
+     }
+     n.split_ = 3;
+     n.split_value_ = 3.14;
+     SECTION("Copy Constructor"){
+         tree_node c( n);
+         REQUIRE( c.split_ == n.split_);
+         REQUIRE( c.split_value_ == n.split_value_);
+         CHECK( c.is_leaf());
+         CHECK_FALSE( c.is_not_leaf());
+     }
+     SECTION("Move Constructor"){
+        tree_node c( std::move( n));
+        REQUIRE( c.split_ == 3);
+        REQUIRE( c.split_value_ == 3.14);
+        CHECK( c.is_leaf());
+        CHECK_FALSE( c.is_not_leaf());
+    }
+   }
+   SECTION("Assignment and Equality Operators"){
+    SECTION("Equality Operator"){
+        tree_node c( n);
+        REQUIRE(c == n);
+    }
+    SECTION("Inequality Operator"){
+        tree_node c;
+        REQUIRE( c != n);
+    }
+    SECTION( "Assignment Operator"){
+    }
+  
+  }
 }

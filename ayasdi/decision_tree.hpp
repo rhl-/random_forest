@@ -42,7 +42,7 @@ public:
  dtree_node& operator=( dtree_node&& f){
     split_ = std::move( f.split_);
     split_value_ = std::move( f.split_value_); 
-    left_child_index_ =  std::move( f.left_child_index_); 
+    left_child_index_ =  std::move(f.left_child_index_); 
     right_child_index_ = std::move(f.right_child_index_);
     return *this;
  }
@@ -94,16 +94,22 @@ public:
  * Inserts left child
  */
  node& insert_left_child(node& parent){
+     if( parent.left_child_index_ == 0){
      parent.left_child_index_ = tree_nodes.size();
      return insert();
+     } 
+     return tree_nodes[ parent.left_child_index_];
  }
 
  /**
  * Inserts right child
  */
  node& insert_right_child(node& parent){
-     parent.right_child_index_ = tree_nodes.size();
-     return insert();
+     if( parent.right_child_index_ == 0){
+      parent.right_child_index_ = tree_nodes.size();
+      return insert();
+     }
+     return tree_nodes[parent.right_child_index_];
  }
 
 /** 
