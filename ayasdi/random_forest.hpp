@@ -1,8 +1,8 @@
 #pragma once
 
 //Project
-#include "tree.hpp"
-#include "random_sample.hpp"
+#include <ayasdi/decision_tree.hpp>
+#include <ayasdi/random_sample.hpp>
 
 //STL
 #include <unordered_map>
