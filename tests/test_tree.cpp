@@ -7,9 +7,10 @@
 
 namespace ml = ayasdi::ml;
 
+typedef ml::decision_tree< double> tree; 
+typedef tree::node tree_node;
+
 TEST_CASE("Tree Tests", "[decision_tree]"){
- typedef ml::decision_tree< double> tree; 
- typedef tree::node tree_node;
  tree t;
  auto g = t.root();
  SECTION("Insert Root Node"){
@@ -23,7 +24,9 @@ TEST_CASE("Tree Tests", "[decision_tree]"){
   REQUIRE( t[  g.left_child_index()] == left_child);
   REQUIRE( t[ g.right_child_index()] == right_child);
  }
- SECTION("Node Functions"){
+}
+
+TEST_CASE("Node Tests"){
     SECTION("Constructors"){
      tree_node n;
      SECTION("Default Constructor"){
@@ -48,8 +51,19 @@ TEST_CASE("Tree Tests", "[decision_tree]"){
         CHECK( c.is_leaf());
         CHECK_FALSE( c.is_not_leaf());
     }
-    //SECTION("Equality Operators"){
-    //}
+   }
+   SECTION("Assignment and Equality Operators"){
+    SECTION("Equality Operator"){
+        tree_node c( n);
+        REQUIRE(c == n);
+    }
+    SECTION("Inequality Operator"){
+        tree_node c;
+        REQUIRE( c != n);
+    }
+    SECTION( "Assignment Operator"){
+    }
+  
   }
  }
 }
