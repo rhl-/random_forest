@@ -3,11 +3,14 @@
 //Project
 #include <ayasdi/decision_tree.hpp>
 #include <ayasdi/random_sample.hpp>
+#include <ayasdi/math.hpp>
 
 //STL
 #include <unordered_map>
 #include <cmath> //log
 #include <numeric> //iota
+#include <unordered_set> //set for oob error.
+#include <set> //set for oob error.
 
 #define MAX_TREE_HEIGHT 30
 
@@ -19,6 +22,7 @@ class random_forest{
 public:
  typedef typename Output::value_type Label_type;
 private:
+ typedef std::unordered_map< Label_type, std::size_t> Map;
  typedef decision_tree< Label_type> tree;
 
  template< typename Row_index_iterator>
@@ -34,7 +38,9 @@ private:
  
  //Set data of leaf node to be a leaf node.
  //TODO: This needs to be carefully handled.
- void generate_leaf_node( typename tree::node& n, Label_type label){ n.split_value_ = label; }
+ void generate_leaf_node( typename tree::node& n, Label_type label){ 
+    n.split_value_ = label; 
+ }
  
  //Set data of node to be an internal decision node of tree
  void set_split( typename tree::node& n, std::size_t& column_index, double& split_threshold_value){
@@ -44,17 +50,18 @@ private:
  
  template< typename Row_index_iterator>
  Label_type get_majority_vote( Row_index_iterator begin, Row_index_iterator end, Output& output){
-     typedef std::unordered_map< Label_type, std::size_t> Map;
-     Map votes;
-     for( ; begin != end; ++begin){ votes[ *begin]++; }
+    votes_.clear();
+    for( ; begin != end; ++begin){ votes_[ output[ *begin]]++; }
+
      typedef typename Map::value_type pair;
-     auto max_elt= std::max_element( votes.begin(), votes.end(), 
-                              [](const pair& a, const pair& b)->bool{ return (a.second < b.second); } );
+     auto max_elt= std::max_element( votes_.begin(), votes_.end(), 
+                                    [](const pair& a, const pair& b)->bool{ return (a.second < b.second); } );
      return max_elt->first;
+
  }
 
  template< typename Counts>
- double entropy( const Counts& counts, std::size_t& n){
+ inline double entropy( const Counts& counts, std::size_t& n){
      double denominator = 1.0/n;
      double entropy=0.0;
      for( auto& key_value_pair: counts){
@@ -65,7 +72,7 @@ private:
  }
 
  template< typename Counts>
- double balanced_entropy( Counts& lower_counts, Counts& upper_counts, 
+ inline double balanced_entropy( Counts& lower_counts, Counts& upper_counts, 
                           std::size_t lower_index, std::size_t upper_index, 
                           std::size_t number_of_rows){
      double lower_entropy = entropy( lower_counts, lower_index);
@@ -79,14 +86,15 @@ private:
                           //Observation: we may sort the row iterators safely
                           Row_index_iterator row_idx_begin, Row_index_iterator row_idx_end,
                           Output_column_iterator output_begin, Output_column_iterator output_end){
-    typedef std::unordered_map< Label_type, std::size_t> Map; 
     //We just sort the row indices into order
     //We can GPU accelerate this for fun with thrust::sort()
     //Also we can try tbb::sort()
+    ayasdi::timer t;
     auto cmp = [&](const std::size_t& a, const std::size_t& b)->bool{ return (*(col_begin+a) < *(col_begin+b));};
     std::sort( row_idx_begin, row_idx_end, cmp);
-    Map lower_counts, upper_counts;
-    for( auto i = row_idx_begin; i != row_idx_end; ++i) { upper_counts[ *i]++; }
+
+    lower_counts.clear(), upper_counts.clear();
+    for( auto i = row_idx_begin; i != row_idx_end; ++i) { upper_counts[ *(output_begin+*i)]++; }
    
     std::size_t number_of_rows=std::distance(row_idx_begin,row_idx_end);
     std::pair< std::size_t, double> best_split(0, std::numeric_limits< double>::infinity());
@@ -94,6 +102,7 @@ private:
     best_split.second = balanced_entropy( lower_counts, upper_counts, 1, number_of_rows-1, number_of_rows);
     std::size_t category_width=0;
     for( auto split_index = row_idx_begin+1; split_index != row_idx_end;  ++split_index){
+    t.start();
         //TODO: Compute split optimization function Entropy, Gini, etc.
         auto class_label = *(output_begin+*split_index);
         lower_counts[class_label]++;
@@ -111,17 +120,31 @@ private:
            best_split.second = current_entropy;
            if( current_entropy == 0.0 ){ return best_split; }
         }
+    t.stop();
     }
     return best_split;
  }                                                                                                                 
                                                                                                                    
 public:
  std::size_t max_tree_height() const                   { return max_tree_height_; }
- bool    set_max_tree_height( std::size_t new_height_) { 
+ bool    set_max_tree_height( std::size_t new_height_) {
      max_tree_height_ = std::min(new_height_, (std::size_t)MAX_TREE_HEIGHT); 
      return (new_height_ <= MAX_TREE_HEIGHT);
  }
-
+template< typename Vector>
+void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound, Vector& vector){
+    std::mt19937 gen(rd());
+    //std::uniform_int_distribution<> dis(lower_bound, upper_bound);
+    //vector.reserve( .63*(upper_bound - lower_bound)); //(1-1/e)*range
+    //for( std::size_t i = 0; i < (upper_bound-lower_bound); ++i){ 
+    //    auto idx = dis(gen);
+    //    auto it = std::lower_bound( vector.begin(), vector.end(), idx);
+    //    if( it == vector.end() || ((it != vector.end()) && (*it != idx))){ vector.insert(it, idx); }
+    //}
+   vector.resize( upper_bound-lower_bound, 0);
+   std::iota( vector.begin(), vector.end(), 0);
+   std::random_shuffle( vector.begin(), vector.end());
+}
  template< typename Row_index_iterator>
  void build_random_tree( Row_index_iterator row_begin, Row_index_iterator row_end, 
                          Dataset& dataset, Output& output, tree& t, typename tree::node& n, 
@@ -139,22 +162,18 @@ public:
     //TODO: Check if assuming log( number of data elements) is appropriate
     //Data is too small to waste time splitting. We punt.
     //Create a leaf node and give it a majority decision
-    if( height > max_tree_height() || std::distance(row_begin, row_end) < std::log( dataset.m())){
+    if( height >= max_tree_height() || std::distance(row_begin, row_end) <= 5){//std::log( dataset.m())){
         auto class_label = get_majority_vote( row_begin, row_end, output);
         generate_leaf_node(n, class_label);
         return;
-    }
+    }        
 
     //Choose a random subset of subset_size columns
-    int subset_size = column_subset_size_*dataset.n();
+    std::size_t subset_size = column_subset_size_*dataset.n();
     //create a vector of length n
-    Vector columns( dataset.n(), 0);
-    //fill with numbers [0,n)
-    std::iota(columns.begin(), columns.end(), 0);
-    //random permutation
-    std::random_shuffle(columns.begin(), columns.end());
-    //hang on to only the first subset_size of them.
-    columns.erase( columns.begin()+subset_size, columns.end());
+    Vector columns;
+    random_subset_from_range(0, dataset.n(), columns);
+    columns.erase( columns.begin()+column_subset_size_*(dataset.n()), columns.end());
 
     //Output Variables
     double best_entropy=std::numeric_limits< double>::infinity();
@@ -203,40 +222,68 @@ public:
 
  template< typename Column_major_dataset>
  void train( Column_major_dataset& dataset, Output& output){
+    typedef math::Vector< typename Column_major_dataset::value_type > Vector;
     trees.reserve( number_of_trees_);
+    math::Matrix< int> confusion_matrix( 2, 2);
+    ayasdi::timer t;
+    double tree_time=0.0;
+    Vector v( dataset.n(), 0.0);
     for( int i = 0; i < number_of_trees_; ++i){
         auto& current_tree = insert();
         current_tree.reserve( dataset.n());
         auto& root = current_tree.insert_root();
-        std::vector< std::size_t> row_indices( dataset.m(), 0);
-        std::iota( row_indices.begin(), row_indices.end(), 0);
-        std::random_shuffle( row_indices.begin(), row_indices.end());
-        row_indices.erase( row_indices.begin()+row_subset_size_*row_indices.size(), row_indices.end());
-        build_random_tree( row_indices.begin(), row_indices.end(), dataset, output, current_tree, root); 
+        std::vector< std::size_t> row_indices;
+        random_subset_from_range(0, dataset.m(), row_indices);
+        double row_fraction = .63;
+        t.start();
+        build_random_tree( row_indices.begin(), row_indices.begin() + row_fraction*dataset.m(), dataset, output, current_tree, root); 
+        t.stop();
+        tree_time += t.elapsed();
+
+        Map votes;
+        for( auto i = row_indices.begin() + row_fraction*dataset.m(); i != row_indices.end(); ++i){
+            strided_iterator p( dataset( *i, 0), dataset.m());
+            auto label = classify( p, votes);
+            confusion_matrix( label, output[ *i])++;
+        }
     }
+    std::cout << "Tree Time: " << tree_time << std::endl;
+    std::cout << "Confusion Matrix: " << confusion_matrix << std::endl;
+
+    auto success = confusion_matrix(0,0) + confusion_matrix(1,1);
+    auto failure = confusion_matrix(1,0) + confusion_matrix(0,1);
+    auto total = success+failure;
+    std::cout << "OOB Error: " << (1.0 - ((double)success/total)) << std::endl;
  }
 
  template< typename Datapoint>
  Label_type classify( Datapoint& p) const{
-    typedef std::unordered_map< Label_type, std::size_t> Map; 
     Map votes;
-    for( auto & tree: trees){ votes[ tree.vote( p)]++; }
+    return classify( p, votes);
+ }
+ 
+private:
+ template< typename Datapoint>
+ Label_type classify( Datapoint& p, Map& votes) const{
+    for(auto& tree: trees){ votes[ tree.vote( p)]++; }
     typedef typename Map::value_type pair;
     auto max_elt= 
     std::max_element( votes.begin(), votes.end(), [](const pair& a, const pair& b)->bool { return a.second < b.second; } );
     return max_elt->first;
  }
- 
-private:
+
  tree& insert(){
     trees.emplace_back();
     return trees.back();
  }
+
  std::vector< tree> trees;
  std::size_t number_of_trees_=500;
- double column_subset_size_=.30;
- double row_subset_size_=.67;
- std::size_t max_tree_height_=MAX_TREE_HEIGHT;
+ double column_subset_size_=.63;
+ std::size_t max_tree_height_=20;
+ std::random_device rd;
+ Map votes_;
+ Map lower_counts, upper_counts;
 }; //end class random_forest
 
 } //end namespace ml
