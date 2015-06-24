@@ -4,6 +4,7 @@
 #include <ayasdi/decision_tree.hpp>
 #include <ayasdi/random_sample.hpp>
 #include <ayasdi/math.hpp>
+#include <ayasdi/row_view.hpp>
 
 //STL
 #include <unordered_map>
@@ -227,7 +228,6 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     math::Matrix< int> confusion_matrix( 2, 2);
     ayasdi::timer t;
     double tree_time=0.0;
-    Vector v( dataset.n(), 0.0);
     for( int i = 0; i < number_of_trees_; ++i){
         auto& current_tree = insert();
         current_tree.reserve( dataset.n());
@@ -242,7 +242,7 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
 
         Map votes;
         for( auto i = row_indices.begin() + row_fraction*dataset.m(); i != row_indices.end(); ++i){
-            strided_iterator p( dataset( *i, 0), dataset.m());
+            ayasdi::row_view< typename Column_major_dataset::pointer> p( &dataset( *i, 0), dataset.m());
             auto label = classify( p, votes);
             confusion_matrix( label, output[ *i])++;
         }
