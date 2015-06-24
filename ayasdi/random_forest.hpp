@@ -265,6 +265,7 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
 private:
  template< typename Datapoint>
  Label_type classify( Datapoint& p, Map& votes) const{
+    votes.clear();
     for(auto& tree: trees){ votes[ tree.vote( p)]++; }
     typedef typename Map::value_type pair;
     auto max_elt= 
