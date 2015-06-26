@@ -22,9 +22,21 @@ template< typename Dataset, typename Output>
 class random_forest{
 public:
  typedef typename Output::value_type Label_type;
+ typedef decision_tree< Label_type> tree;
+
+ //Default Constructor
+ random_forest() : number_of_trees_(500), column_subset_size_(0.30), max_tree_height_(MAX_TREE_HEIGHT)
+ {}
+ random_forest( const random_forest& f): number_of_trees_(f.number_of_trees_), 
+                                         column_subset_size_(f.column_subset_size_), 
+                                         max_tree_height_(f.max_tree_height_){}
+ //Parametrized Constructor
+ random_forest(std::size_t number_of_trees, double column_subset_size, std::size_t max_tree_height) :
+ number_of_trees_(number_of_trees), column_subset_size_(column_subset_size), max_tree_height_(max_tree_height)
+ {}
+ 
 private:
  typedef std::unordered_map< Label_type, std::size_t> Map;
- typedef decision_tree< Label_type> tree;
 
  template< typename Row_index_iterator>
  bool is_pure_column( Row_index_iterator begin, Row_index_iterator end, Output& output){
