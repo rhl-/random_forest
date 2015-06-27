@@ -155,8 +155,10 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
    std::iota( vector.begin(), vector.end(), 0);
    std::random_shuffle( vector.begin(), vector.end());
 }
- template< typename Row_index_iterator>
- void build_random_tree( Row_index_iterator row_begin, Row_index_iterator row_end, 
+ template< typename Row_index_iterator, typename Confusion_matrix>
+ void build_random_tree( Row_index_iterator row_begin, Row_index_iterator row_end,
+                         Row_index_iterator oob_begin, Row_index_iterator oob_end, 
+                         Confusion_matrix& confusion_matrix,
                          Dataset& dataset, Output& output, tree& t, typename tree::node& n, 
                         std::size_t height=0){
     typedef std::vector< std::size_t> Vector;
@@ -165,6 +167,10 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     //Create a leaf node with this decision
     if( is_pure_column( row_begin, row_end, output)){
         generate_leaf_node(n, output[ *row_begin]);
+        //Update OOB Confusion Matrix
+        for( auto i = oob_begin; i != oob_end; ++i){ 
+            confusion_matrix( output[ *row_begin] , output[ *i])++; 
+        }
         return;
     }
 
@@ -173,6 +179,10 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     //Create a leaf node and give it a majority decision
     if( height >= max_tree_height() || std::distance(row_begin, row_end) <= 5){//std::log( dataset.m())){
         auto class_label = get_majority_vote( row_begin, row_end, output);
+        //Update OOB Confusion Matrix
+        for( auto i = oob_begin; i != oob_end; ++i){ 
+            confusion_matrix( class_label, output[ *i])++; 
+        }
         generate_leaf_node(n, class_label);
         return;
     }        
@@ -193,7 +203,7 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     for(auto& column: columns){
         std::pair< std::size_t, double> 
         split_and_entropy = find_best_column_split( dataset.begin( column), dataset.end( column), 
-                                                    row_begin, row_end, //Obs: We may sort this all we like.
+                                                    row_begin, row_end, 
                                                     output.begin(), output.end());
         if( split_and_entropy.second < best_entropy){
             //Record the entropy so far and which column we are in
@@ -204,7 +214,7 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
             std::size_t split_index = split_and_entropy.first;
 
             //Get the entry containing the split_threshold_value
-            split_threshold_value = *(dataset.begin( column)+*(row_begin+split_index));
+            split_threshold_value = *(dataset.begin( column)+row_begin[ split_index]);
 
             //Since we resort at every step we make physical copies of the row indices
             //If the column was gaurunteed sorted then we could skip this!
@@ -215,6 +225,8 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     }
     //Build the split into the tree
     set_split( n, column_index_for_split, split_threshold_value);
+    auto oob_middle = std::partition( oob_begin, oob_end, 
+                    [&](const std::size_t& a){ return output[ a] < split_threshold_value; });
     //add children nodes into Decision Tree
     auto kids = t.insert_children( n);
     //Recursively call.
@@ -222,12 +234,18 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     auto& right_indices = std::get< 1>(row_indices_for_split);
     ++height; //make sure to increment height!
     if(left_indices.size()) {
-        build_random_tree(left_indices.begin(), left_indices.end(), dataset, output, t, 
+        build_random_tree(left_indices.begin(), left_indices.end(), 
+                          oob_begin, oob_middle,
+                          confusion_matrix,
+                          dataset, output, t, 
                           std::get<0>(kids), height);
     }
     if( right_indices.size()) {
         auto& right_child = t.insert_right_child( n);
-        build_random_tree(right_indices.begin(), right_indices.end(), dataset, output, t, 
+        build_random_tree(right_indices.begin(), right_indices.end(), 
+                          oob_middle, oob_end,
+                          confusion_matrix,
+                          dataset, output, t, 
                           std::get<1>(kids), height);
     }
  }
@@ -248,17 +266,21 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
         random_subset_from_range(0, dataset.m(), row_indices);
         double row_fraction = .63;
         t.start();
-        build_random_tree( row_indices.begin(), row_indices.begin() + row_fraction*dataset.m(), dataset, output, current_tree, root); 
+        build_random_tree( row_indices.begin(), 
+                           row_indices.begin() + row_fraction*dataset.m(),
+                           row_indices.begin() + row_fraction*dataset.m(),
+                           row_indices.end(), confusion_matrix,
+                           dataset, output, current_tree, root); 
         t.stop();
         tree_time += t.elapsed();
 
-        Map votes;
-        for( auto i = row_indices.begin() + row_fraction*dataset.m(); i != row_indices.end(); ++i){
-            for( auto j = 0; j < dataset.n(); ++j){ row[ j] = dataset( *i, j); }
-            auto label = classify( row, votes);
-            confusion_matrix( label , output[ *i])++;
-            votes.fill( 0);
-        }
+        //Map votes;
+        //for( auto i = row_indices.begin() + row_fraction*dataset.m(); i != row_indices.end(); ++i){
+        //    for( auto j = 0; j < dataset.n(); ++j){ row[ j] = dataset( *i, j); }
+        //    auto label = classify( row, votes);
+        //    confusion_matrix( label , output[ *i])++;
+        //    votes.fill( 0);
+        //}
     }
     std::cout << "Tree Time: " << tree_time << std::endl;
     std::cout << "Confusion Matrix: " << confusion_matrix << std::endl;
