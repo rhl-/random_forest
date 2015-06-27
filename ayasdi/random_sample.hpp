@@ -1,7 +1,8 @@
 #pragma once
 /****************************************************************************
  * Original Author Keith Schwartz @ Stanford
- * Modified by Ryan H. Lewis
+ * Modified by Ryan H. Lewis 
+ * License BSD-3 
  * 
  * Implementation of a random sampling algorithm on streams.  The algorithm
  * takes as input a stream of values (represented by a range of input
