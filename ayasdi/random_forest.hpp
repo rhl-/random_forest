@@ -253,11 +253,8 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
         tree_time += t.elapsed();
 
         Map votes;
-        for( auto j = 0; j < dataset.n(); ++j){ 
-            for( auto i = row_indices.begin() + row_fraction*dataset.m(); 
-                      i != row_indices.end(); ++i){ row[ j] = dataset( *i, j); }
-        }
         for( auto i = row_indices.begin() + row_fraction*dataset.m(); i != row_indices.end(); ++i){
+            for( auto j = 0; j < dataset.n(); ++j){ row[ j] = dataset( *i, j); }
             auto label = classify( row, votes);
             confusion_matrix( label , output[ *i])++;
             votes.fill( 0);
