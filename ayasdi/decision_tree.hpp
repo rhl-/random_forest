@@ -47,15 +47,15 @@ public:
     return *this;
  }
 
- bool     is_leaf() const { return (left_child_index_ == 0 && 
+ inline bool     is_leaf() const { return (left_child_index_ == 0 && 
                                     right_child_index_ == 0); }
- bool is_not_leaf() const { return !is_leaf(); }
+ inline bool is_not_leaf() const { return !is_leaf(); }
  
  //TODO: Figure out the correct behavior for this
  Label_type class_label() const { return (Label_type)split_value_; }
 
- int  left_child_index() const { return  left_child_index_; }
- int right_child_index() const { return right_child_index_; }
+ inline int  left_child_index() const { return  left_child_index_; }
+ inline int right_child_index() const { return right_child_index_; }
 
  //TODO: Define invariants for how these values are set for leaf nodes.
  std::size_t split_=0; 
@@ -137,16 +137,16 @@ public:
  * class_label() supported by this tree. 
  */
  template< typename Datapoint>
- Label_type vote( Datapoint& p) const{
-    node current_node = root();
-    while( current_node.is_not_leaf()){
-        if( p[ current_node.split_] < current_node.split_value_){
-            current_node = tree_nodes[ current_node.left_child_index()];
+ inline Label_type vote( Datapoint& p) const{
+    const node* current_node = &root();
+    while( current_node->is_not_leaf()){
+        if( p[ current_node->split_] < current_node->split_value_){
+            current_node = &tree_nodes[ current_node->left_child_index()];
         }else{ 
-            current_node = tree_nodes[ current_node.right_child_index()];
+            current_node = &tree_nodes[ current_node->right_child_index()];
         }
     }
-    return current_node.class_label();
+    return current_node->class_label();
  }
 
  /**

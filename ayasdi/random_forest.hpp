@@ -4,7 +4,6 @@
 #include <ayasdi/decision_tree.hpp>
 #include <ayasdi/random_sample.hpp>
 #include <ayasdi/math.hpp>
-#include <ayasdi/row_view.hpp>
 
 //STL
 #include <unordered_map>
@@ -36,7 +35,7 @@ public:
  {}
  
 private:
- typedef std::unordered_map< Label_type, std::size_t> Map;
+ typedef std::array< std::size_t, 2> Map;
 
  template< typename Row_index_iterator>
  bool is_pure_column( Row_index_iterator begin, Row_index_iterator end, Output& output){
@@ -63,25 +62,23 @@ private:
  
  template< typename Row_index_iterator>
  Label_type get_majority_vote( Row_index_iterator begin, Row_index_iterator end, Output& output){
-    votes_.clear();
+    votes_.fill( 0);
     for( ; begin != end; ++begin){ votes_[ output[ *begin]]++; }
 
      typedef typename Map::value_type pair;
-     auto max_elt= std::max_element( votes_.begin(), votes_.end(), 
-                                    [](const pair& a, const pair& b)->bool{ return (a.second < b.second); } );
-     return max_elt->first;
-
+     auto max_elt= std::max_element( votes_.begin(), votes_.end()); 
+     return std::distance( votes_.begin(), max_elt);
  }
 
  template< typename Counts>
  inline double entropy( const Counts& counts, std::size_t& n){
      double denominator = 1.0/n;
      double entropy=0.0;
-     for( auto& key_value_pair: counts){
-         double p = (key_value_pair.second)*denominator;
-         entropy -= p*std::log( p);
-     }
-     return entropy;
+     for( const auto& q: counts){
+         const double p = (double)q*denominator;
+         if( p > 0){ entropy -= p*std::log( p); }
+      }
+      return entropy;
  }
 
  template< typename Counts>
@@ -106,28 +103,28 @@ private:
     auto cmp = [&](const std::size_t& a, const std::size_t& b)->bool{ return (*(col_begin+a) < *(col_begin+b));};
     std::sort( row_idx_begin, row_idx_end, cmp);
 
-    lower_counts.clear(), upper_counts.clear();
-    for( auto i = row_idx_begin; i != row_idx_end; ++i) { upper_counts[ *(output_begin+*i)]++; }
-   
+    lower_counts.fill( 0); upper_counts.fill( 0);
+    for( auto i = row_idx_begin; i != row_idx_end; ++i) { 
+        upper_counts[ output_begin[ *i]]++; 
+    }
+
     std::size_t number_of_rows=std::distance(row_idx_begin,row_idx_end);
     std::pair< std::size_t, double> best_split(0, std::numeric_limits< double>::infinity());
     //By assumption at this point number_of_rows > 1
-    best_split.second = balanced_entropy( lower_counts, upper_counts, 1, number_of_rows-1, number_of_rows);
-    std::size_t category_width=0;
+    best_split.second = balanced_entropy( lower_counts, upper_counts, 
+                                          1, number_of_rows-1, number_of_rows);
     for( auto split_index = row_idx_begin+1; split_index != row_idx_end;  ++split_index){
     t.start();
-        //TODO: Compute split optimization function Entropy, Gini, etc.
-        auto class_label = *(output_begin+*split_index);
+        auto class_label = output_begin[ *split_index];
         lower_counts[class_label]++;
         upper_counts[class_label]--;
         //This logic handles repeated values in the input column
-        if( col_begin+*split_index == col_begin+*(split_index-1)){ 
-            category_width++;
-            continue; 
-        }else{ category_width = 0; } 
+        if( col_begin+*split_index == col_begin+*(split_index-1)){ continue; }
         auto lower_index = std::distance(row_idx_begin,split_index)+1;
         auto upper_index = number_of_rows-lower_index;
-        auto current_entropy = balanced_entropy( lower_counts, upper_counts, lower_index, upper_index, number_of_rows);
+        auto current_entropy = balanced_entropy( lower_counts, upper_counts, 
+                                                 lower_index, upper_index, 
+                                                 number_of_rows);
         if( current_entropy < best_split.second){     
            best_split.first  = std::distance( row_idx_begin, split_index);
            best_split.second = current_entropy;
@@ -167,8 +164,7 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     //Not possible to split, decision is already made.
     //Create a leaf node with this decision
     if( is_pure_column( row_begin, row_end, output)){
-        Label_type& class_label = output[ *row_begin];
-        generate_leaf_node(n, class_label);
+        generate_leaf_node(n, output[ *row_begin]);
         return;
     }
 
@@ -226,10 +222,13 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     auto& right_indices = std::get< 1>(row_indices_for_split);
     ++height; //make sure to increment height!
     if(left_indices.size()) {
-        build_random_tree(left_indices.begin(), left_indices.end(), dataset, output, t, std::get<0>(kids), height);
+        build_random_tree(left_indices.begin(), left_indices.end(), dataset, output, t, 
+                          std::get<0>(kids), height);
     }
     if( right_indices.size()) {
-        build_random_tree(right_indices.begin(), right_indices.end(), dataset, output, t, std::get<1>(kids), height);
+        auto& right_child = t.insert_right_child( n);
+        build_random_tree(right_indices.begin(), right_indices.end(), dataset, output, t, 
+                          std::get<1>(kids), height);
     }
  }
 
@@ -240,6 +239,7 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
     math::Matrix< int> confusion_matrix( 2, 2);
     ayasdi::timer t;
     double tree_time=0.0;
+    Vector row( dataset.n(), 0.0);
     for( int i = 0; i < number_of_trees_; ++i){
         auto& current_tree = insert();
         current_tree.reserve( dataset.n());
@@ -253,10 +253,14 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
         tree_time += t.elapsed();
 
         Map votes;
+        for( auto j = 0; j < dataset.n(); ++j){ 
+            for( auto i = row_indices.begin() + row_fraction*dataset.m(); 
+                      i != row_indices.end(); ++i){ row[ j] = dataset( *i, j); }
+        }
         for( auto i = row_indices.begin() + row_fraction*dataset.m(); i != row_indices.end(); ++i){
-            ayasdi::row_view< typename Column_major_dataset::pointer> p( &dataset( *i, 0), dataset.m());
-            auto label = classify( p, votes);
-            confusion_matrix( label, output[ *i])++;
+            auto label = classify( row, votes);
+            confusion_matrix( label , output[ *i])++;
+            votes.fill( 0);
         }
     }
     std::cout << "Tree Time: " << tree_time << std::endl;
@@ -277,12 +281,11 @@ void random_subset_from_range( std::size_t lower_bound, std::size_t upper_bound,
 private:
  template< typename Datapoint>
  Label_type classify( Datapoint& p, Map& votes) const{
-    votes.clear();
     for(auto& tree: trees){ votes[ tree.vote( p)]++; }
     typedef typename Map::value_type pair;
     auto max_elt= 
-    std::max_element( votes.begin(), votes.end(), [](const pair& a, const pair& b)->bool { return a.second < b.second; } );
-    return max_elt->first;
+    std::max_element( votes.begin(), votes.end());
+    return std::distance( votes.begin(), max_elt);
  }
 
  tree& insert(){
@@ -291,9 +294,9 @@ private:
  }
 
  std::vector< tree> trees;
- std::size_t number_of_trees_=500;
- double column_subset_size_=.63;
- std::size_t max_tree_height_=20;
+ std::size_t number_of_trees_;
+ double column_subset_size_;
+ std::size_t max_tree_height_;
  std::random_device rd;
  Map votes_;
  Map lower_counts, upper_counts;
