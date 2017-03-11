@@ -1,51 +1,43 @@
-#include <ayasdi/random_forest.hpp>
-#include <ayasdi/math.hpp>
-#include <cstdlib>
-#include <ctime>
+#include <random_forest/random_forest.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
-namespace math = ayasdi::math;
-namespace ml = ayasdi::ml;
-namespace io = math::io;
+namespace py = pybind11;
 
-int main(int argc, char ** argv){
-    if( argc != 3){
-        std::cerr << "Usage: " << argv[ 0] << " train_data.csv test_data.csv" << std::endl; 
-        return 0;
-    }
-    typedef math::Matrix< double, math::Column_major> Column_major_matrix;
-    typedef math::Matrix< double> Row_major_matrix;
-    typedef math::Vector_facade< double> Output_vector;
-    typedef math::Vector_facade< double> Datapoint;
-    typedef math::Matrix_facade< double, math::Column_major> Matrix_facade;
-    typedef ml::random_forest< Column_major_matrix, Output_vector> random_forest;
-    Column_major_matrix A;
-    Row_major_matrix B;
-    bool fail = io::read_matrix( std::string( argv[ 1]), A);
-    if( fail) { 
-        std::cout << std::endl; 
-        return fail; 
-    }
-    fail = io::read_matrix( std::string( argv[ 2]), B);
-    if( fail) { 
-        std::cout << std::endl; 
-        return fail; 
-    }
-    std::cout << "Matrix A: " << A.m() << " " << A.n() << std::endl;
-    random_forest rf;
-    Matrix_facade X( A.m(), A.n()-1, &*A.begin( 1));
-    Output_vector y( A.m(), &*A.begin( 0));
-    std::srand(std::time(0));
-    ayasdi::timer t;
-    t.start();
-    rf.train( A, y);
-    t.stop();
-    std::cout << "Training Time: " << t.elapsed() << std::endl; 
-    t.start();
-    for( std::size_t i = 0; i < B.m(); ++i){
-        Datapoint z( B.n()-1, &*B.begin( i)++);
-        rf.classify( z);
-    }
-    t.stop();
-    std::cout << "Testing Time: " << t.elapsed() << std::endl; 
-    return 0;
+
+PYBIND11_PLUGIN(ml) {
+    py::module m("ml", "Machine Learning Code");
+
+    using Rf = ml::Random_forest;
+
+    py::class_<Rf> rf(m, "RandomForest");
+    .def("__init__",
+      [](Rf &instance, std::list<c> arg) {
+          new (&instance) s(std::begin(arg), std::end(arg));
+     })
+    template< typename T>
+    using Matrix = py::array<T, py::array::f_style | py::array::forcecast>;
+    
+    typedef Matrix<double> DoubleMatrix;
+    typedef Matrix<float> FloatMatrix;
+    
+    rf.def("fit", [](Rf& rfi, DoubleMatrix& X, DoubleMatrix& y){
+    	rfi.fit(X,y);
+	return rfi; 
+    });
+    rf.def("fit", [](Rf& rfi, FloatMatrix& X, DoubleMatrix& y){
+    	rfi.fit(X,y);
+    	return rfi; 
+    });
+    rf.def("fit", [](Rf& rfi, DoubleMatrix& X, FloatMatrix& y){
+    	rfi.fit(X,y);
+	return rfi; 
+    });
+    rf.def("fit", [](Rf& rfi, FloatMatrix& X, FloatMatrix& y){
+    	rfi.fit(X,y);
+	return rfi; 
+    });
+    rf.def("predict", [](Rf& rfi, DoubleMatrix& x){ return rfi.predict(x); });
+    rf.def("predict", [](Rf& rfi, FloatMatrix& x){ return rfi.predict(x); });
+    return m.ptr();
 }
