@@ -52,7 +52,8 @@
  * numbers, but a custom random generator may be used instead.
  */
 #include <cstdlib> // For rand
-namespace ayasdi{
+//BOOST
+#include <boost/iterator/counting_iterator.hpp>
 /**
  * Function: RandomSample(InputIterator in_begin, InputIterator in_end,
  *                        RandomAccessIterator out_begin, RandomAccessIterator out_end);
@@ -121,4 +122,28 @@ RandomAccessIterator random_sample(InputIterator in_begin, InputIterator in_end,
                             RandomAccessIterator out_begin, RandomAccessIterator out_end) {
   return random_sample(in_begin, in_end, out_begin, out_end, std::rand);
 }
-} //namespace ayasdi
+
+
+template< typename Vector>
+void random_subset_size_k( std::size_t lower_bound, std::size_t upper_bound, std::size_t k, Vector& vector){
+  typedef boost::counting_iterator< std::size_t> counting_iterator;
+  
+  vector.resize( k, 0);
+  random_sample( counting_iterator( lower_bound), counting_iterator( upper_bound),
+                 vector.begin(), vector.end(), gen);
+}
+
+template< typename Vector>
+void random_shuffle_range( std::size_t lower_bound, std::size_t upper_bound, Vector& vector){
+  std::mt19937 gen(rd());
+  //std::uniform_int_distribution<> dis(lower_bound, upper_bound);
+  //vector.reserve( .63*(upper_bound - lower_bound)); //(1-1/e)*range
+  //for( std::size_t i = 0; i < (upper_bound-lower_bound); ++i){
+  //    auto idx = dis(gen);
+  //    auto it = std::lower_bound( vector.begin(), vector.end(), idx);
+  //    if( it == vector.end() || ((it != vector.end()) && (*it != idx))){ vector.insert(it, idx); }
+  //}
+  vector.resize( upper_bound-lower_bound, 0);
+  std::iota( vector.begin(), vector.end(), 0);
+  std::random_shuffle( vector.begin(), vector.end());
+}

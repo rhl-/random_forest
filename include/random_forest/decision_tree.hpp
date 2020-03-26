@@ -92,7 +92,19 @@ public:
      auto& right_child = insert_right_child( parent);		
      return std::forward_as_tuple(left_child, right_child);
  }
-
+ 
+ //Set data of leaf node to be a leaf node.
+ //TODO: This needs to be carefully handled.
+ void generate_leaf_node( Label_type label){
+  split_value_ = label;
+ }
+ 
+ //Set data of node to be an internal decision node of tree
+ void set_split( std::size_t& column_index, double& split_threshold_value){
+  n.split_ = column_index;
+  n.split_value_ = split_threshold_value;
+ }
+ 
  /**
  * Input: a datapoint which provides a double operator[]()
  * This function walks the decision tree and returns the 
